@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>聖誕極限堆疊：全球連線版</title>
+    <title>聖誕極限堆疊：最終修復版</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;900&display=swap');
@@ -19,6 +19,7 @@
             align-items: center;
             height: 100vh;
             user-select: none;
+            -webkit-user-select: none; /* Safari */
         }
 
         canvas {
@@ -236,7 +237,6 @@
     const leaderboardList = document.getElementById('leaderboard-list');
     const uploadStatus = document.getElementById('upload-status');
 
-    // 您的專屬 API 網址 (已更新為您提供的連結)
     const API_URL = "https://script.google.com/macros/s/AKfycbw0bmD2IM3YeMg7aiYlhe_gokCz96WXZJTEIKPvFMjp3geanG4GcFNLgmZl8-aqjTD4og/exec";
     
     let GAME_WIDTH = 500;
@@ -254,8 +254,9 @@
     let cameraY = 0;
     let playerName = "Player"; 
     
-    // 手機檢測
     let isMobile = false;
+    // 輸入冷卻時間標記
+    let inputCooldown = 0;
 
     let santa = { x: -200, y: 100, active: false, speed: 3 };
 
@@ -290,14 +291,12 @@
         uploadStatus.innerText = "分數上傳雲端中...";
         uploadStatus.style.opacity = 1;
 
-        // 使用 no-cors 模式發送
         fetch(API_URL, {
             method: 'POST',
             mode: 'no-cors', 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: name, score: score })
         }).then(() => {
-            // 延遲更新，讓後端有時間寫入
             setTimeout(() => {
                 uploadStatus.innerText = "上傳完成！";
                 loadLeaderboard();
@@ -316,7 +315,6 @@
     });
 
     function checkMobile() {
-        // 如果螢幕寬度小於 600，我們假設它是手機或平板
         if (window.innerWidth < 600) {
             isMobile = true;
         } else {
@@ -329,7 +327,7 @@
         GAME_HEIGHT = window.innerHeight;
         canvas.width = GAME_WIDTH;
         canvas.height = GAME_HEIGHT;
-        checkMobile(); // 重新檢測
+        checkMobile();
         if(state === 'IDLE') draw(); 
     }
     window.addEventListener('resize', resize);
@@ -388,16 +386,8 @@
         const prev = stack[stack.length - 1];
         let nextType = (score % 2 === 0) ? 0 : 1; 
         
-        // 速度公式
         let baseSpeed = 5 + (score * 0.4); 
-        
-        // --- 手機優化邏輯 ---
-        // 如果是手機，速度打 6 折
-        if (isMobile) {
-            baseSpeed *= 0.6; 
-        }
-
-        // 最高速限也適度調整
+        if (isMobile) baseSpeed *= 0.6; // 手機降速
         let maxSpeed = isMobile ? 10 : 15;
         if (baseSpeed > maxSpeed) baseSpeed = maxSpeed;
 
@@ -420,6 +410,9 @@
             activeBlock.vx = baseSpeed;
         }
         
+        // 設定 0.2 秒的輸入冷卻，防止誤觸剛生成的方塊
+        inputCooldown = 200; // ms
+
         if (!santa.active && Math.random() < 0.1) {
             santa.active = true;
             santa.x = -200;
@@ -435,11 +428,28 @@
     }
 
     function handleInput() {
+        // 檢查冷卻時間
+        if (inputCooldown > 0) return;
+
         if (state !== 'PLAYING' || !activeBlock || activeBlock.state !== 'HOVER') return;
         activeBlock.state = 'DROP';
         activeBlock.vx = 0;
         activeBlock.vy = 28;
         state = 'DROPPING';
+    }
+
+    let lastTime = 0;
+    function loop(timestamp) {
+        const deltaTime = timestamp - lastTime;
+        lastTime = timestamp;
+
+        if(inputCooldown > 0) {
+            inputCooldown -= deltaTime;
+        }
+
+        update();
+        draw();
+        requestAnimationFrame(loop);
     }
 
     function update() {
@@ -634,13 +644,7 @@
         }
     }
 
-    function loop() {
-        update();
-        draw();
-        requestAnimationFrame(loop);
-    }
-
-    loop();
+    requestAnimationFrame(loop);
 
     window.addEventListener('keydown', (e) => {
         if((e.code === 'ArrowDown' || e.code === 'Space') && state === 'PLAYING') handleInput();
@@ -650,13 +654,21 @@
         }
     });
     
+    // 嚴格的手機防誤觸控制
     document.addEventListener('touchstart', (e) => {
-        if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-        handleInput();
+        // 禁止瀏覽器默認行為 (例如縮放或產生 mousedown)
+        if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+            e.preventDefault(); 
+            handleInput();
+        }
     }, {passive: false});
+
     document.addEventListener('mousedown', (e) => {
-        if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-        handleInput();
+        // 如果是手機，已經用 touchstart 處理過了，忽略 mousedown
+        if (isMobile) return; 
+        if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+            handleInput();
+        }
     });
 
 </script>
