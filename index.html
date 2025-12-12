@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>聖誕極限堆疊：全球連線版</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
@@ -37,7 +37,6 @@
             justify-content: center; 
         }
 
-        /* 分數顯示 */
         #score {
             font-family: 'Mountains of Christmas', cursive;
             font-size: 90px;
@@ -50,7 +49,6 @@
             top: 10px;
         }
 
-        /* 左上角成就榜 */
         #achievement-board {
             position: absolute;
             top: 20px;
@@ -65,7 +63,6 @@
             width: 140px;
         }
 
-        /* 右上角排行榜 (全球連線) */
         #leaderboard {
             position: absolute;
             top: 20px;
@@ -115,7 +112,6 @@
             font-style: italic;
         }
 
-        /* 成就項目樣式 */
         .ach-item {
             display: flex;
             align-items: center;
@@ -132,7 +128,6 @@
         }
         .ach-icon { font-size: 20px; margin-right: 8px; width: 25px; text-align: center; }
 
-        /* 選單畫面 */
         .menu-screen {
             position: absolute;
             top: 0; left: 0;
@@ -159,7 +154,6 @@
         
         p { color: #a4b0be; font-size: 18px; margin-bottom: 20px; text-align: center; line-height: 1.5; }
 
-        /* 輸入框樣式 */
         #player-name-input {
             padding: 10px 15px;
             font-size: 20px;
@@ -242,10 +236,9 @@
     const leaderboardList = document.getElementById('leaderboard-list');
     const uploadStatus = document.getElementById('upload-status');
 
-    // --- 設定區 ---
+    // 您的專屬 API 網址 (已更新為您提供的連結)
     const API_URL = "https://script.google.com/macros/s/AKfycbw0bmD2IM3YeMg7aiYlhe_gokCz96WXZJTEIKPvFMjp3geanG4GcFNLgmZl8-aqjTD4og/exec";
     
-    // 遊戲參數
     let GAME_WIDTH = 500;
     let GAME_HEIGHT = 800;
     const BLOCK_HEIGHT = 50;
@@ -260,22 +253,20 @@
     let state = 'IDLE'; 
     let cameraY = 0;
     let playerName = "Player"; 
+    
+    // 手機檢測
+    let isMobile = false;
 
     let santa = { x: -200, y: 100, active: false, speed: 3 };
 
-    // --- 雲端排行榜邏輯 ---
-
     async function loadLeaderboard() {
-        // 先顯示讀取中
-        // leaderboardList.innerHTML = '<li class="loading-text">更新數據中...</li>';
-        
         try {
             const response = await fetch(API_URL);
             const data = await response.json();
             renderLeaderboard(data);
         } catch (error) {
             console.error("讀取排行榜失敗:", error);
-            leaderboardList.innerHTML = '<li class="loading-text">連線失敗 (請檢查網路)</li>';
+            leaderboardList.innerHTML = '<li class="loading-text">連線失敗 (請檢查權限)</li>';
         }
     }
 
@@ -296,22 +287,17 @@
     function saveScoreToCloud(name, score) {
         if(score === 0) return; 
 
-        // 顯示上傳狀態
         uploadStatus.innerText = "分數上傳雲端中...";
         uploadStatus.style.opacity = 1;
 
-        // 使用 no-cors 模式發送 POST，因為 GAS 在瀏覽器端會有 CORS 限制
-        // no-cors 意味著我們發送了但不知道是否成功 (fire and forget)
-        // 但對這種輕量遊戲來說足夠了
+        // 使用 no-cors 模式發送
         fetch(API_URL, {
             method: 'POST',
             mode: 'no-cors', 
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: name, score: score })
         }).then(() => {
-            // 假設成功，等待 1 秒後重新抓取排行榜
+            // 延遲更新，讓後端有時間寫入
             setTimeout(() => {
                 uploadStatus.innerText = "上傳完成！";
                 loadLeaderboard();
@@ -322,21 +308,28 @@
         });
     }
 
-    // 初始化
     window.addEventListener('load', () => {
         const savedName = localStorage.getItem('stacker_last_name');
         if (savedName) nameInput.value = savedName;
-        // 遊戲一開始先抓一次排行榜
         loadLeaderboard();
+        checkMobile();
     });
 
-    // --- 遊戲核心 (未更動) ---
+    function checkMobile() {
+        // 如果螢幕寬度小於 600，我們假設它是手機或平板
+        if (window.innerWidth < 600) {
+            isMobile = true;
+        } else {
+            isMobile = false;
+        }
+    }
 
     function resize() {
         GAME_WIDTH = window.innerWidth > 600 ? 500 : window.innerWidth;
         GAME_HEIGHT = window.innerHeight;
         canvas.width = GAME_WIDTH;
         canvas.height = GAME_HEIGHT;
+        checkMobile(); // 重新檢測
         if(state === 'IDLE') draw(); 
     }
     window.addEventListener('resize', resize);
@@ -395,8 +388,18 @@
         const prev = stack[stack.length - 1];
         let nextType = (score % 2 === 0) ? 0 : 1; 
         
-        let speed = 5 + (score * 0.4); 
-        if (speed > 14) speed = 14;
+        // 速度公式
+        let baseSpeed = 5 + (score * 0.4); 
+        
+        // --- 手機優化邏輯 ---
+        // 如果是手機，速度打 6 折
+        if (isMobile) {
+            baseSpeed *= 0.6; 
+        }
+
+        // 最高速限也適度調整
+        let maxSpeed = isMobile ? 10 : 15;
+        if (baseSpeed > maxSpeed) baseSpeed = maxSpeed;
 
         activeBlock = {
             x: 0, 
@@ -404,17 +407,17 @@
             w: prev.w,
             h: BLOCK_HEIGHT,
             type: nextType,
-            vx: speed,
+            vx: baseSpeed,
             vy: 0,
             state: 'HOVER'
         };
 
         if (Math.random() > 0.5) {
             activeBlock.x = GAME_WIDTH; 
-            activeBlock.vx = -speed;
+            activeBlock.vx = -baseSpeed;
         } else {
             activeBlock.x = -prev.w;
-            activeBlock.vx = speed;
+            activeBlock.vx = baseSpeed;
         }
         
         if (!santa.active && Math.random() < 0.1) {
@@ -556,9 +559,7 @@
             gameOverTitle.style.color = "#ff4757";
         }
         
-        // --- 觸發上傳 ---
         saveScoreToCloud(playerName, score);
-
         gameOverScreen.classList.remove('hidden');
     }
 
