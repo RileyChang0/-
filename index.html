@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聖誕極限堆疊：全球連線版</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;900&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0d1117;
+            font-family: 'Noto Sans TC', sans-serif;
+            touch-action: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        canvas {
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+        
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            justify-content: center; 
+        }
+
+        /* 分數顯示 */
+        #score {
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: 90px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 10px #ff0000, 0 0 20px #00ff00;
+            margin-top: 10px;
+            z-index: 5;
+            position: absolute;
+            top: 10px;
+        }
+
+        /* 左上角成就榜 */
+        #achievement-board {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 14px;
+            z-index: 10;
+            width: 140px;
+        }
+
+        /* 右上角排行榜 (全球連線) */
+        #leaderboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #fdcb6e; 
+            color: white;
+            z-index: 10;
+            min-width: 160px;
+            text-align: center;
+        }
+        
+        #leaderboard h3 {
+            margin: 0 0 10px 0;
+            color: #fdcb6e;
+            font-family: 'Mountains of Christmas', cursive;
+            font-size: 22px;
+            text-shadow: 0 0 5px orange;
+        }
+
+        #leaderboard ol {
+            padding-left: 25px;
+            margin: 0;
+            text-align: left;
+            font-size: 14px;
+            min-height: 50px;
+        }
+        
+        #leaderboard li {
+            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 2px;
+        }
+        
+        .score-val {
+            float: right;
+            color: #2ed573;
+            font-weight: bold;
+        }
+
+        .loading-text {
+            color: #aaa;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        /* 成就項目樣式 */
+        .ach-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            opacity: 0.3; 
+            transition: all 0.5s ease;
+            color: white;
+            font-weight: bold;
+        }
+        .ach-item.unlocked {
+            opacity: 1;
+            text-shadow: 0 0 10px gold;
+            transform: scale(1.05) translateX(5px);
+        }
+        .ach-icon { font-size: 20px; margin-right: 8px; width: 25px; text-align: center; }
+
+        /* 選單畫面 */
+        .menu-screen {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 20, 40, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: auto;
+            transition: opacity 0.3s;
+        }
+        
+        .hidden { opacity: 0; pointer-events: none; }
+
+        h1 {
+            font-family: 'Mountains of Christmas', cursive;
+            color: #ff4757;
+            font-size: 60px;
+            margin: 0 0 10px 0;
+            text-shadow: 2px 2px 0px #fff;
+        }
+        
+        p { color: #a4b0be; font-size: 18px; margin-bottom: 20px; text-align: center; line-height: 1.5; }
+
+        /* 輸入框樣式 */
+        #player-name-input {
+            padding: 10px 15px;
+            font-size: 20px;
+            border-radius: 8px;
+            border: 2px solid #2ed573;
+            background: #0d1117;
+            color: white;
+            margin-bottom: 20px;
+            text-align: center;
+            font-family: inherit;
+            outline: none;
+            width: 200px;
+        }
+        #player-name-input:focus {
+            box-shadow: 0 0 15px rgba(46, 213, 115, 0.5);
+        }
+
+        .btn {
+            padding: 12px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(to bottom, #ff4757, #c0392b);
+            border: 2px solid #fff;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+            transition: transform 0.1s;
+        }
+        .btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+        .btn:active { transform: scale(0.95); }
+
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="score">0</div>
+        
+        <div id="achievement-board">
+            <div class="ach-item" id="ach-5"><span class="ach-icon">🔔</span> 5層-鈴鐺</div>
+            <div class="ach-item" id="ach-10"><span class="ach-icon">🧦</span> 10層-襪子</div>
+            <div class="ach-item" id="ach-15"><span class="ach-icon">🦌</span> 15層-馴鹿</div>
+            <div class="ach-item" id="ach-20"><span class="ach-icon">🎅</span> 20層-聖老</div>
+        </div>
+
+        <div id="leaderboard">
+            <h3>🌎 全球榜 🌎</h3>
+            <ol id="leaderboard-list">
+                <li class="loading-text">連線中...</li>
+            </ol>
+        </div>
+    </div>
+
+    <div id="start-screen" class="menu-screen">
+        <h1>聖誕極限堆疊</h1>
+        <p>禮物盒不會回頭！<br>輸入你的大名挑戰世界紀錄</p>
+        <input type="text" id="player-name-input" placeholder="輸入暱稱" maxlength="8">
+        <button class="btn" onclick="startGame()">開始挑戰</button>
+    </div>
+
+    <div id="game-over-screen" class="menu-screen hidden">
+        <h1 id="game-over-title">錯過了！</h1>
+        <p>最終高度: <span id="final-score" style="color: gold; font-weight:bold; font-size:28px;">0</span> 層</p>
+        <p id="upload-status" style="font-size: 14px; color: #2ed573; margin-top: -15px; opacity: 0;">分數上傳中...</p>
+        <button class="btn" onclick="restartGame()">再試一次</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const finalScoreEl = document.getElementById('final-score');
+    const gameOverTitle = document.getElementById('game-over-title');
+    const nameInput = document.getElementById('player-name-input');
+    const leaderboardList = document.getElementById('leaderboard-list');
+    const uploadStatus = document.getElementById('upload-status');
+
+    // --- 設定區 ---
+    const API_URL = "https://script.google.com/macros/s/AKfycbw0bmD2IM3YeMg7aiYlhe_gokCz96WXZJTEIKPvFMjp3geanG4GcFNLgmZl8-aqjTD4og/exec";
+    
+    // 遊戲參數
+    let GAME_WIDTH = 500;
+    let GAME_HEIGHT = 800;
+    const BLOCK_HEIGHT = 50;
+    const INITIAL_WIDTH = 260;
+    const SPAWN_Y = 150;
+
+    let stack = [];
+    let debris = [];
+    let snow = []; 
+    let activeBlock = null;
+    let score = 0;
+    let state = 'IDLE'; 
+    let cameraY = 0;
+    let playerName = "Player"; 
+
+    let santa = { x: -200, y: 100, active: false, speed: 3 };
+
+    // --- 雲端排行榜邏輯 ---
+
+    async function loadLeaderboard() {
+        // 先顯示讀取中
+        // leaderboardList.innerHTML = '<li class="loading-text">更新數據中...</li>';
+        
+        try {
+            const response = await fetch(API_URL);
+            const data = await response.json();
+            renderLeaderboard(data);
+        } catch (error) {
+            console.error("讀取排行榜失敗:", error);
+            leaderboardList.innerHTML = '<li class="loading-text">連線失敗 (請檢查網路)</li>';
+        }
+    }
+
+    function renderLeaderboard(data) {
+        leaderboardList.innerHTML = "";
+        if (!data || data.length === 0) {
+            leaderboardList.innerHTML = '<li class="loading-text">暫無紀錄</li>';
+            return;
+        }
+
+        data.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `${item.name} <span class="score-val">${item.score}</span>`;
+            leaderboardList.appendChild(li);
+        });
+    }
+
+    function saveScoreToCloud(name, score) {
+        if(score === 0) return; 
+
+        // 顯示上傳狀態
+        uploadStatus.innerText = "分數上傳雲端中...";
+        uploadStatus.style.opacity = 1;
+
+        // 使用 no-cors 模式發送 POST，因為 GAS 在瀏覽器端會有 CORS 限制
+        // no-cors 意味著我們發送了但不知道是否成功 (fire and forget)
+        // 但對這種輕量遊戲來說足夠了
+        fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors', 
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: name, score: score })
+        }).then(() => {
+            // 假設成功，等待 1 秒後重新抓取排行榜
+            setTimeout(() => {
+                uploadStatus.innerText = "上傳完成！";
+                loadLeaderboard();
+            }, 1500);
+        }).catch(err => {
+            console.error("上傳失敗", err);
+            uploadStatus.innerText = "上傳失敗";
+        });
+    }
+
+    // 初始化
+    window.addEventListener('load', () => {
+        const savedName = localStorage.getItem('stacker_last_name');
+        if (savedName) nameInput.value = savedName;
+        // 遊戲一開始先抓一次排行榜
+        loadLeaderboard();
+    });
+
+    // --- 遊戲核心 (未更動) ---
+
+    function resize() {
+        GAME_WIDTH = window.innerWidth > 600 ? 500 : window.innerWidth;
+        GAME_HEIGHT = window.innerHeight;
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+        if(state === 'IDLE') draw(); 
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function initSnow() {
+        snow = [];
+        for(let i=0; i<50; i++) {
+            snow.push({
+                x: Math.random() * GAME_WIDTH,
+                y: Math.random() * GAME_HEIGHT,
+                r: Math.random() * 2 + 1,
+                speed: Math.random() * 1 + 0.5
+            });
+        }
+    }
+
+    function startGame() {
+        const inputVal = nameInput.value.trim();
+        playerName = inputVal || "聖誕精靈";
+        localStorage.setItem('stacker_last_name', playerName); 
+
+        startScreen.classList.add('hidden');
+        resetGame();
+    }
+
+    function restartGame() {
+        gameOverScreen.classList.add('hidden');
+        resetGame();
+    }
+
+    function resetGame() {
+        stack = [];
+        debris = [];
+        score = 0;
+        cameraY = 0;
+        scoreEl.innerText = score;
+        state = 'PLAYING';
+        
+        document.querySelectorAll('.ach-item').forEach(el => el.classList.remove('unlocked'));
+
+        const baseBlock = {
+            x: (GAME_WIDTH - INITIAL_WIDTH) / 2,
+            y: GAME_HEIGHT - 100, 
+            w: INITIAL_WIDTH,
+            h: BLOCK_HEIGHT,
+            type: 2 
+        };
+        stack.push(baseBlock);
+
+        initSnow();
+        spawnNextBlock();
+    }
+
+    function spawnNextBlock() {
+        const prev = stack[stack.length - 1];
+        let nextType = (score % 2 === 0) ? 0 : 1; 
+        
+        let speed = 5 + (score * 0.4); 
+        if (speed > 14) speed = 14;
+
+        activeBlock = {
+            x: 0, 
+            y: SPAWN_Y,
+            w: prev.w,
+            h: BLOCK_HEIGHT,
+            type: nextType,
+            vx: speed,
+            vy: 0,
+            state: 'HOVER'
+        };
+
+        if (Math.random() > 0.5) {
+            activeBlock.x = GAME_WIDTH; 
+            activeBlock.vx = -speed;
+        } else {
+            activeBlock.x = -prev.w;
+            activeBlock.vx = speed;
+        }
+        
+        if (!santa.active && Math.random() < 0.1) {
+            santa.active = true;
+            santa.x = -200;
+            santa.y = Math.random() * 200 + 50;
+        }
+    }
+
+    function checkAchievements(s) {
+        if (s >= 5) document.getElementById('ach-5').classList.add('unlocked');
+        if (s >= 10) document.getElementById('ach-10').classList.add('unlocked');
+        if (s >= 15) document.getElementById('ach-15').classList.add('unlocked');
+        if (s >= 20) document.getElementById('ach-20').classList.add('unlocked');
+    }
+
+    function handleInput() {
+        if (state !== 'PLAYING' || !activeBlock || activeBlock.state !== 'HOVER') return;
+        activeBlock.state = 'DROP';
+        activeBlock.vx = 0;
+        activeBlock.vy = 28;
+        state = 'DROPPING';
+    }
+
+    function update() {
+        if (state === 'IDLE') return;
+
+        snow.forEach(p => {
+            p.y += p.speed;
+            p.x += Math.sin(p.y * 0.01) * 0.5;
+            if(p.y > GAME_HEIGHT) {
+                p.y = -10;
+                p.x = Math.random() * GAME_WIDTH;
+            }
+        });
+
+        if (santa.active) {
+            santa.x += santa.speed;
+            if (santa.x > GAME_WIDTH + 100) santa.active = false;
+        }
+
+        if (activeBlock) {
+            if (activeBlock.state === 'HOVER') {
+                activeBlock.x += activeBlock.vx;
+
+                if (activeBlock.vx > 0 && activeBlock.x > GAME_WIDTH) {
+                    gameOver("miss");
+                }
+                else if (activeBlock.vx < 0 && activeBlock.x + activeBlock.w < 0) {
+                    gameOver("miss");
+                }
+            }
+            else if (activeBlock.state === 'DROP') {
+                activeBlock.y += activeBlock.vy;
+                
+                const target = stack[stack.length - 1];
+                if (activeBlock.y + activeBlock.h >= target.y) {
+                    processLanding(target);
+                }
+                if (activeBlock && activeBlock.y > GAME_HEIGHT) {
+                    gameOver("collapse");
+                }
+            }
+        }
+
+        for(let i=debris.length-1; i>=0; i--) {
+            let d = debris[i];
+            d.x += d.vx;
+            d.y += d.vy;
+            d.vy += 1;
+            d.rot += 0.1;
+            if(d.y > GAME_HEIGHT) debris.splice(i,1);
+        }
+
+        const targetY = stack[stack.length-1].y;
+        const idealY = GAME_HEIGHT * 0.65;
+        if (targetY < idealY) {
+            const diff = idealY - targetY;
+            cameraY += diff * 0.1;
+            stack.forEach(b => b.y += diff * 0.1);
+            debris.forEach(d => d.y += diff * 0.1);
+            if(activeBlock && activeBlock.state === 'DROP') {
+                activeBlock.y += diff * 0.1;
+            }
+        }
+    }
+
+    function processLanding(target) {
+        const left = Math.max(activeBlock.x, target.x);
+        const right = Math.min(activeBlock.x + activeBlock.w, target.x + target.w);
+        const overlap = right - left;
+
+        if (overlap <= 0) {
+            addDebris(activeBlock.x, activeBlock.y, activeBlock.w, activeBlock.h, activeBlock.type);
+            gameOver("collapse");
+        } else {
+            if (activeBlock.x < target.x) { 
+                addDebris(activeBlock.x, activeBlock.y, target.x - activeBlock.x, activeBlock.h, activeBlock.type);
+            }
+            if (activeBlock.x + activeBlock.w > target.x + target.w) { 
+                addDebris(target.x + target.w, activeBlock.y, (activeBlock.x + activeBlock.w) - (target.x + target.w), activeBlock.h, activeBlock.type);
+            }
+
+            activeBlock.x = left;
+            activeBlock.w = overlap;
+            activeBlock.y = target.y - activeBlock.h;
+            activeBlock.vx = 0;
+            activeBlock.vy = 0;
+            activeBlock.state = 'STATIC';
+            
+            stack.push(activeBlock);
+            score++;
+            scoreEl.innerText = score;
+            
+            checkAchievements(score);
+            state = 'PLAYING';
+            spawnNextBlock();
+        }
+    }
+
+    function addDebris(x, y, w, h, type) {
+        if(w < 1) return;
+        debris.push({
+            x: x, y: y, w: w, h: h, type: type,
+            vx: (Math.random()-0.5)*8, vy: -5, rot: 0
+        });
+    }
+
+    function gameOver(reason) {
+        state = 'GAMEOVER';
+        activeBlock = null;
+        finalScoreEl.innerText = score;
+        
+        if (reason === "miss") {
+            gameOverTitle.innerText = "錯過了！";
+            gameOverTitle.style.color = "#a4b0be";
+        } else {
+            gameOverTitle.innerText = "倒塌了！";
+            gameOverTitle.style.color = "#ff4757";
+        }
+        
+        // --- 觸發上傳 ---
+        saveScoreToCloud(playerName, score);
+
+        gameOverScreen.classList.remove('hidden');
+    }
+
+    function drawGiftBlock(b) {
+        let mainColor, ribbonColor;
+        if (b.type === 0) { 
+            mainColor = '#d63031'; ribbonColor = '#ffeaa7';
+        } else if (b.type === 1) { 
+            mainColor = '#00b894'; ribbonColor = '#d63031';
+        } else { 
+            mainColor = '#fdcb6e'; ribbonColor = '#d63031';
+        }
+
+        ctx.fillStyle = mainColor;
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+
+        ctx.fillStyle = ribbonColor;
+        const ribbonWidth = 6;
+        ctx.fillRect(b.x + b.w/2 - ribbonWidth/2, b.y, ribbonWidth, b.h);
+        ctx.fillRect(b.x, b.y + b.h/2 - ribbonWidth/2, b.w, ribbonWidth);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(b.x, b.y, b.w, 4);
+        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        ctx.fillRect(b.x, b.y + b.h - 4, b.w, 4);
+    }
+
+    function draw() {
+        let gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+        gradient.addColorStop(0, "#0f0c29");
+        gradient.addColorStop(1, "#302b63");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        snow.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+            ctx.fill();
+        });
+
+        if (santa.active) {
+            ctx.font = "40px Arial";
+            ctx.save();
+            ctx.scale(-1, 1); 
+            ctx.fillText("🦌🛷🎅", -santa.x, santa.y);
+            ctx.restore();
+        }
+
+        stack.forEach(b => drawGiftBlock(b));
+
+        debris.forEach(d => {
+            ctx.save();
+            ctx.translate(d.x+d.w/2, d.y+d.h/2);
+            ctx.rotate(d.rot);
+            drawGiftBlock({x: -d.w/2, y: -d.h/2, w: d.w, h: d.h, type: d.type});
+            ctx.restore();
+        });
+
+        if (activeBlock) {
+            drawGiftBlock(activeBlock);
+            if(activeBlock.state === 'HOVER') {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(activeBlock.x + activeBlock.w/2, activeBlock.y + activeBlock.h);
+                ctx.lineTo(activeBlock.x + activeBlock.w/2, GAME_HEIGHT);
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+
+    window.addEventListener('keydown', (e) => {
+        if((e.code === 'ArrowDown' || e.code === 'Space') && state === 'PLAYING') handleInput();
+        if(e.code === 'Enter' && state !== 'PLAYING') {
+            if(!startScreen.classList.contains('hidden')) startGame();
+            if(!gameOverScreen.classList.contains('hidden')) restartGame();
+        }
+    });
+    
+    document.addEventListener('touchstart', (e) => {
+        if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+        handleInput();
+    }, {passive: false});
+    document.addEventListener('mousedown', (e) => {
+        if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+        handleInput();
+    });
+
+</script>
+</body>
+</html>
